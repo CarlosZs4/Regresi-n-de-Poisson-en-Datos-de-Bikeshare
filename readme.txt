@@ -4,7 +4,7 @@ Primero, abra una terminal en la carpeta del repositorio y cree el entorno (esto
 
 python3 -m venv env
 
-luego, en la terminal del repositorio y ejecutar
+luego, en la terminal del repositorio ejecute
 
 source env/bin/activate
 
