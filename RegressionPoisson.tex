@@ -1,0 +1,104 @@
+\documentclass[12pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[spanish]{babel}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{booktabs}
+\usepackage{float} % Indispensable para fijar la posición de las imágenes con [H]
+
+\title{Proyecto Final de Probabilidad: Regresión de Poisson en Datos de Bikeshare}
+\author{Carlos Zárate, Naiceyni}
+\date{5 de abril de 2026}
+
+\begin{document}
+
+\maketitle
+
+\section{Introducción}
+El presente proyecto aborda el modelado del conteo de bicicletas rentadas en un sistema de transporte urbano utilizando técnicas de estadística aplicada. A diferencia de las variables continuas, el número de usuarios ($Y$) es una variable aleatoria de conteo que toma valores en los enteros no negativos $\{0, 1, 2, \dots\}$. 
+
+El objetivo es implementar un Modelo Lineal Generalizado (GLM) de Poisson para entender cómo factores externos como la temperatura, la hora del día y las condiciones climáticas afectan la tasa de ocurrencia de rentas. Se justifica el uso de la distribución de Poisson dado que modela adecuadamente eventos independientes en un intervalo de tiempo continuo.
+
+\section{Metodología Computacional y Matemática}
+Siguiendo el texto de Luis Rincón, asumimos que la variable respuesta $Y_i$ sigue una distribución de Poisson con parámetro $\lambda_i$:
+\begin{equation}
+P(Y_i = y_i) = \frac{e^{-\lambda_i} \lambda_i^{y_i}}{y_i!}
+\end{equation}
+Donde el valor esperado es $E[Y_i] = \lambda_i$. En la regresión de Poisson, utilizamos una función de enlace logarítmica para conectar las covariables $X_i$ con el parámetro:
+\begin{equation}
+\log(\lambda_i) = \beta_0 + \beta_1 X_{i1} + \dots + \beta_p X_{ip} \implies \lambda_i = e^{X_i \beta}
+\end{equation}
+Esta transformación garantiza que $\lambda_i > 0$, una propiedad que la regresión lineal simple no posee. El ajuste del modelo se realizó mediante la maximización de la función de Log-Verosimilitud ($\ell(\beta)$):
+\begin{equation}
+\ell(\beta) = \sum_{i=1}^{n} [y_i (X_i \beta) - e^{X_i \beta} - \log(y_i!)]
+\end{equation}
+El desarrollo computacional se llevó a cabo en \textbf{Python 3.11}, utilizando la librería \texttt{statsmodels} para el ajuste de GLM y \texttt{pandas} para el manejo de datos.
+
+\section{Análisis Exploratorio (Resultados I)}
+El análisis visual de los datos reveló una distribución de la variable \textit{bikers} con una marcada asimetría a la derecha, característica típica de procesos de Poisson donde los valores bajos son frecuentes y los eventos masivos son menos probables. Se observó una correlación positiva clara entre la temperatura y el volumen de rentas, así como fluctuaciones estacionales según la hora del día (\textit{hr}).
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.85\textwidth]{distribucion-bikers.png} 
+    \caption{Histograma de la variable aleatoria de conteo \textit{bikers}. La alta frecuencia de valores cercanos a cero coincide con los periodos de baja demanda documentados en el dataset.}
+    \label{fig:distribucion_bikers}
+\end{figure}
+
+\section{Modelado y Comparación (Resultados II)}
+Se comparó el modelo de Regresión Lineal Múltiple (OLS) frente al GLM de Poisson. Los resultados principales se resumen a continuación:
+
+\begin{itemize}
+    \item \textbf{Falla del Modelo Lineal:} Aunque a nivel agregado el modelo lineal parece seguir la tendencia, el análisis de residuos revela que en condiciones de baja demanda, el modelo OLS arroja valores negativos (518 instancias), invalidando su uso físico.
+    
+    \begin{figure}[H]
+        \centering
+        \includegraphics[width=0.85\textwidth]{modeloOSL.png}
+        \caption{Evidencia de fallo en OLS: Predicciones por debajo de cero.}
+        \label{fig:modelo_ols}
+    \end{figure}
+
+    \item \textbf{Consistencia de Poisson:} El modelo de Poisson, al utilizar el enlace exponencial, produjo predicciones estrictamente positivas. El valor de \textit{Log-Likelihood} obtenido fue de $-4.201 \times 10^5$.
+
+    \begin{figure}[H]
+        \centering
+        \includegraphics[width=0.85\textwidth]{regresionPoisson.png}
+        \caption{Validación del modelo de Poisson: Valores reales vs. predicciones positivas.}
+        \label{fig:modelo_poisson}
+    \end{figure}
+\end{itemize}
+\subsection{Procedimiento de Estimación de Coeficientes}
+Debido a que las ecuaciones de normalidad de la regresión de Poisson son no-lineales, los coeficientes no se obtienen por despeje algebraico, sino por un proceso iterativo de optimización numérica. El valor final de 0.0526 para la temperatura es el punto de convergencia donde se maximiza la probabilidad global de los datos observados. Después de tener los valores mediante Estimación por Máxima Verosimilitud, tenemos el siguiente recuadro:
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lcr}
+\toprule
+Variable & Coeficiente ($\beta$) & Efecto Multiplicativo ($e^\beta$) \\
+\midrule
+Temperatura (temp) & 0.0526 & 1.0540 \\
+Clima (weathersit) & -0.0384 & 0.9623 \\
+Día Laboral (workingday) & -0.0125 & 0.9875 \\
+\bottomrule
+\end{tabular}
+\caption{Interpretación de coeficientes del modelo de Poisson.}
+\end{table}
+
+\textbf{Interpretación de coeficientes:} 
+De acuerdo con los resultados del Cuadro 1, se observa que la temperatura tiene un impacto positivo; específicamente, por cada grado Celsius adicional, la tasa esperada de rentas aumenta un $5.4\%$. Por otro lado, el coeficiente del clima ($weathersit$) indica que condiciones meteorológicas más severas reducen la tasa esperada de alquileres en un $3.77\%$, reflejando el efecto multiplicativo característico del enlace logarítmico del modelo de Poisson.
+
+\section{Conclusiones}
+La regresión de Poisson demostró ser superior a la regresión lineal para este dataset, no solo por evitar predicciones imposibles (negativas), sino por capturar la relación multiplicativa entre las variables. La temperatura es el predictor más influyente, mientras que condiciones climáticas adversas reducen la tasa de renta.
+
+\section{Anexo - Repositorio de Código}
+El código fuente, el conjunto de datos \textit{Bikeshare.csv} y los scripts de generación de gráficas utilizados en este proyecto están disponibles para su consulta y reproducibilidad en el siguiente repositorio de GitHub:
+
+\vspace{0.3cm}
+\url{https://github.com/CarlosZs4/Regresi-n-de-Poisson-en-Datos-de-Bikeshare}
+\vspace{0.3cm}
+
+El repositorio incluye un readme.txt sobre las instrucciones necesarias para ejecutar el modelo GLM de Poisson presentado en este informe.
+
+\end{document}
